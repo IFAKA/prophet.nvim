@@ -1,0 +1,11 @@
+# Neovim
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Test files
+dw.json
+*_cartridges/
