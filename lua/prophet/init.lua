@@ -2,7 +2,7 @@ local M = {}
 
 M.config = {
   auto_upload = false,
-  clean_on_start = false,
+  clean_on_start = true,
   notify = true,
   progress_style = "float", -- "float" or "statusline"
   ignore_patterns = {

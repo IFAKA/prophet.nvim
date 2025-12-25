@@ -31,7 +31,7 @@ Zero configuration. Reads from your existing `dw.json`. Shows upload progress li
   config = function()
     require("prophet").setup({
       auto_upload = false,       -- Enable/disable auto-upload on save
-      clean_on_start = false,    -- Clean upload all on startup
+      clean_on_start = true,     -- Clean upload all on startup (default: true)
       notify = true,             -- Show progress notifications
       progress_style = "float",  -- "float" or "statusline"
       ignore_patterns = {        -- Files/folders to ignore
