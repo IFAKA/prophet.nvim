@@ -81,6 +81,14 @@ function M.create_temp_zip(cartridge_path, ignore_patterns)
 end
 
 function M.show_progress(current, total, item_name)
+  -- Check if we're in a headless mode or no UI is available
+  local ui_list = vim.api.nvim_list_uis()
+  if #ui_list == 0 then
+    -- Fallback to simple notification in headless mode
+    vim.notify(string.format("Prophet: Uploading %d/%d: %s", current, total, item_name), vim.log.levels.INFO)
+    return
+  end
+  
   if progress_win and vim.api.nvim_win_is_valid(progress_win) then
     vim.api.nvim_win_close(progress_win, true)
   end
@@ -101,7 +109,7 @@ function M.show_progress(current, total, item_name)
     "╰─────────────────────────────────────╯",
   })
   
-  local ui = vim.api.nvim_list_uis()[1]
+  local ui = ui_list[1]
   progress_win = vim.api.nvim_open_win(progress_buf, false, {
     relative = "editor",
     width = 41,
