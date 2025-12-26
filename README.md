@@ -34,6 +34,7 @@ Zero configuration. Reads from your existing `dw.json`. Shows upload progress li
       clean_on_start = true,     -- Clean upload all on startup (default: true)
       notify = true,             -- Show progress notifications
       progress_style = "float",  -- "float" or "statusline"
+      keymaps = true,            -- Enable default keymaps (<leader>p prefix)
       ignore_patterns = {        -- Files/folders to ignore
         "node_modules",
         "%.git",
@@ -100,20 +101,39 @@ Place this file in your project root (where your `*_cartridges` folders are).
 :ProphetDisable " Stop watching
 ```
 
-### Keymaps
+### Keymaps (Opt-in)
 
-Prophet.nvim **automatically sets up keybindings**:
+Prophet.nvim **does NOT set keymaps by default** to avoid conflicts. You have 3 options:
 
-| Keymap | Command | Description |
-|--------|---------|-------------|
-| `<leader>pe` | `:ProphetEnable` | Enable auto-upload |
-| `<leader>pd` | `:ProphetDisable` | Disable auto-upload |
-| `<leader>pt` | `:ProphetToggle` | Toggle auto-upload |
-| `<leader>pc` | `:ProphetClean` | Clean upload all |
+**Option 1: Enable default keymaps** (uses `<leader>p` prefix)
 
-**Which-Key Integration**: If you use which-key (like VimZap does), press `<leader>p` to see all Prophet commands in a menu.
+```lua
+require("prophet").setup({
+  keymaps = true,  -- Enable default keymaps
+})
+```
 
-**No configuration needed** - keymaps work out of the box!
+This sets up:
+- `<leader>pe` → Enable auto-upload
+- `<leader>pd` → Disable auto-upload
+- `<leader>pt` → Toggle auto-upload
+- `<leader>pc` → Clean upload all
+
+**Option 2: Set your own keymaps** (recommended)
+
+```lua
+require("prophet").setup()
+
+-- Then add your own keymaps
+vim.keymap.set("n", "<leader>pe", "<cmd>ProphetEnable<cr>", { desc = "Prophet: Enable" })
+vim.keymap.set("n", "<leader>pd", "<cmd>ProphetDisable<cr>", { desc = "Prophet: Disable" })
+vim.keymap.set("n", "<leader>pt", "<cmd>ProphetToggle<cr>", { desc = "Prophet: Toggle" })
+vim.keymap.set("n", "<leader>pc", "<cmd>ProphetClean<cr>", { desc = "Prophet: Clean" })
+```
+
+**Option 3: Use commands only** (no keymaps)
+
+Just use `:ProphetClean`, `:ProphetToggle`, etc. directly.
 
 ## How It Works
 

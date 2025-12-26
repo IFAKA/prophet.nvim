@@ -25,6 +25,7 @@ return {
           clean_on_start = true,     -- Auto-upload all cartridges on Neovim startup
           notify = true,             -- Show progress notifications
           progress_style = "float",  -- Floating window progress
+          keymaps = true,            -- Enable default keymaps (<leader>p)
           ignore_patterns = {
             "node_modules",
             "%.git",
@@ -36,8 +37,6 @@ return {
   },
 }
 ```
-
-**Note**: Keymaps are **automatically set up** by the plugin! No need to manually add them.
 
 ### 2. Or use VimZap's standard plugin directory
 
@@ -91,18 +90,19 @@ return {
           auto_upload = false,      -- Don't watch by default
           clean_on_start = true,    -- Upload all on startup
           notify = true,
+          keymaps = true,           -- Enable default keymaps (<leader>p)
         })
       end,
-      -- Keymaps are automatically set up!
-      -- Press <leader>p to see all Prophet commands in which-key
     },
   },
 }
 ```
 
+**Note**: `<leader>p` is safe to use - VimZap doesn't use this prefix!
+
 ## Which-Key Integration
 
-Prophet.nvim **automatically registers** with which-key (used by VimZap):
+When you enable `keymaps = true`, Prophet.nvim registers with which-key (used by VimZap).
 
 Press `<leader>p` to see the Prophet menu:
 
@@ -115,7 +115,7 @@ Press `<leader>p` to see the Prophet menu:
 └───────────────────────────────┘
 ```
 
-**No manual setup required!** The plugin detects which-key and auto-registers.
+**Safe from conflicts**: `<leader>p` is not used by VimZap, so it's safe to use!
 
 ## VimZap Command Menu Integration
 

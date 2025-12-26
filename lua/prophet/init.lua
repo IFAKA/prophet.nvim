@@ -5,6 +5,7 @@ M.config = {
   clean_on_start = true,
   notify = true,
   progress_style = "float", -- "float" or "statusline"
+  keymaps = false, -- Set to true to enable default keymaps (<leader>p prefix)
   ignore_patterns = {
     "node_modules",
     "%.git",
@@ -38,6 +39,32 @@ function M.setup(opts)
   -- Setup file watchers if auto upload is enabled
   if M.config.auto_upload then
     M.enable_upload()
+  end
+  
+  -- Setup keymaps if enabled
+  if M.config.keymaps then
+    M.setup_keymaps()
+  end
+end
+
+function M.setup_keymaps()
+  local has_wk, wk = pcall(require, "which-key")
+  
+  if has_wk then
+    -- Register with which-key
+    wk.add({
+      { "<leader>p", group = "prophet" },
+      { "<leader>pe", "<cmd>ProphetEnable<cr>", desc = "enable auto-upload" },
+      { "<leader>pd", "<cmd>ProphetDisable<cr>", desc = "disable auto-upload" },
+      { "<leader>pt", "<cmd>ProphetToggle<cr>", desc = "toggle auto-upload" },
+      { "<leader>pc", "<cmd>ProphetClean<cr>", desc = "clean upload all" },
+    })
+  else
+    -- Fallback: set keymaps directly
+    vim.keymap.set("n", "<leader>pe", "<cmd>ProphetEnable<cr>", { desc = "Prophet: Enable auto-upload" })
+    vim.keymap.set("n", "<leader>pd", "<cmd>ProphetDisable<cr>", { desc = "Prophet: Disable auto-upload" })
+    vim.keymap.set("n", "<leader>pt", "<cmd>ProphetToggle<cr>", { desc = "Prophet: Toggle auto-upload" })
+    vim.keymap.set("n", "<leader>pc", "<cmd>ProphetClean<cr>", { desc = "Prophet: Clean upload all" })
   end
 end
 
