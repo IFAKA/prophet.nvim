@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="banner.png" alt="Prophet.nvim Banner" width="100%">
+</p>
+
 # Prophet.nvim
 
 **SFCC Cartridge Uploader for Neovim** - Upload cartridges to Salesforce Commerce Cloud sandboxes.
