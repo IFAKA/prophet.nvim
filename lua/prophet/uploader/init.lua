@@ -6,6 +6,12 @@ local config_loader = require("prophet.config")
 local watchers = {}
 local upload_queue = {}
 local is_uploading = false
+local progress_state = {
+  total = 0,
+  completed = 0,
+  failed = 0,
+  current_items = {}
+}
 
 function M.init(dw_config, opts)
   M.dw_config = dw_config
@@ -81,7 +87,7 @@ function M.process_queue()
   local cartridges_to_upload = vim.deepcopy(upload_queue)
   upload_queue = {}
   
-  M.upload_cartridges(M.dw_config, cartridges_to_upload, M.opts, function()
+  M.upload_cartridges_parallel(M.dw_config, cartridges_to_upload, M.opts, function()
     is_uploading = false
     if #upload_queue > 0 then
       vim.defer_fn(M.process_queue, 500)
@@ -96,79 +102,92 @@ function M.clean_upload(dw_config, opts)
     return
   end
   
-  -- Temporarily skip sandbox check to test upload directly
-  -- TODO: Fix sandbox check later
-  -- local sandbox_ok, sandbox_msg = config_loader.check_sandbox_status_sync(dw_config)
-  -- if not sandbox_ok then
-  --   vim.notify("Prophet: " .. sandbox_msg, vim.log.levels.ERROR)
-  --   return
-  -- end
-  
-  vim.notify(string.format("Prophet: Sandbox online. Starting clean upload of %d cartridge(s)...", #cartridges), vim.log.levels.INFO)
+  vim.notify(string.format("Prophet: Starting clean upload of %d cartridge(s)...", #cartridges), vim.log.levels.INFO)
   
   local names = vim.tbl_map(function(c) return c.name end, cartridges)
-  M.upload_cartridges(dw_config, names, opts)
+  M.upload_cartridges_parallel(dw_config, names, opts)
 end
 
 function M.upload_single(dw_config, cartridge_name, opts)
-  -- Temporarily skip sandbox check to test upload directly  
-  -- local sandbox_ok, sandbox_msg = config_loader.check_sandbox_status_sync(dw_config)
-  -- if not sandbox_ok then
-  --   vim.notify("Prophet: " .. sandbox_msg, vim.log.levels.ERROR)
-  --   return
-  -- end
-  
-  M.upload_cartridges(dw_config, { cartridge_name }, opts)
+  M.upload_cartridges_parallel(dw_config, { cartridge_name }, opts)
 end
 
-function M.upload_cartridges(dw_config, cartridge_names, opts, callback)
-  local total = #cartridge_names
-  local completed, failed = 0, 0
-  local early_abort = false
+-- NEW: Parallel upload system that doesn't block Neovim
+function M.upload_cartridges_parallel(dw_config, cartridge_names, opts, callback)
+  progress_state.total = #cartridge_names
+  progress_state.completed = 0
+  progress_state.failed = 0
+  progress_state.current_items = {}
   
-  local function upload_next(index)
-    if index > total or early_abort then
-      local msg = early_abort
-        and string.format("Prophet: Upload aborted after %d attempts due to sandbox connectivity issues", index - 1)
-        or (failed == 0 
-          and string.format("Prophet: Successfully uploaded %d/%d cartridge(s)", completed, total)
-          or string.format("Prophet: Upload completed: %d succeeded, %d failed", completed, failed))
-      vim.notify(msg, (failed == 0 and not early_abort) and vim.log.levels.INFO or vim.log.levels.WARN)
-      if callback then callback() end
+  -- Initialize progress display
+  utils.init_progress_display(progress_state.total)
+  
+  local active_uploads = 0
+  local max_parallel = math.min(3, #cartridge_names) -- Limit parallel uploads to avoid overwhelming sandbox
+  local upload_index = 1
+  
+  local function start_next_upload()
+    if upload_index > #cartridge_names then
       return
     end
     
-    local cartridge_name = cartridge_names[index]
-    if opts.notify then utils.show_progress(index, total, cartridge_name) end
+    local cartridge_name = cartridge_names[upload_index]
+    upload_index = upload_index + 1
+    active_uploads = active_uploads + 1
     
-    M.upload_cartridge_zip(dw_config, cartridge_name, function(success, err)
-      if success then
-        completed = completed + 1
-      else
-        failed = failed + 1
-        local error_msg = err or "unknown"
+    -- Update progress to show this cartridge is starting
+    progress_state.current_items[cartridge_name] = "uploading"
+    utils.update_progress_display(progress_state)
+    
+    -- Start upload asynchronously
+    M.upload_cartridge_async(dw_config, cartridge_name, function(success, err)
+      vim.schedule(function() -- Ensure UI updates happen on main thread
+        active_uploads = active_uploads - 1
+        progress_state.current_items[cartridge_name] = nil
         
-        -- Check if this is a connectivity/authentication issue and abort early
-        if error_msg:find("connection") or error_msg:find("timeout") or 
-           error_msg:find("authentication") or error_msg:find("resolve host") or
-           error_msg:find("couldn't connect") or error_msg:find("network") then
-          vim.notify(string.format("Prophet: Connectivity issue detected: %s", error_msg), vim.log.levels.ERROR)
-          vim.notify("Prophet: Stopping upload to avoid repeated failures. Check sandbox status and try again.", vim.log.levels.WARN)
-          early_abort = true
-          upload_next(index + 1) -- Will trigger abort message
-          return
+        if success then
+          progress_state.completed = progress_state.completed + 1
+          if opts.notify then
+            vim.notify(string.format("Prophet: ✓ %s uploaded (%d/%d)", 
+              cartridge_name, progress_state.completed, progress_state.total), vim.log.levels.INFO)
+          end
+        else
+          progress_state.failed = progress_state.failed + 1
+          vim.notify(string.format("Prophet: ✗ %s failed: %s", cartridge_name, err or "unknown"), vim.log.levels.ERROR)
         end
         
-        vim.notify(string.format("Prophet: Failed to upload %s: %s", cartridge_name, error_msg), vim.log.levels.ERROR)
-      end
-      upload_next(index + 1)
+        utils.update_progress_display(progress_state)
+        
+        -- Check if we're done
+        if progress_state.completed + progress_state.failed >= progress_state.total then
+          utils.close_progress_display()
+          local msg = progress_state.failed == 0 
+            and string.format("Prophet: ✓ All %d cartridge(s) uploaded successfully", progress_state.completed)
+            or string.format("Prophet: Upload completed: %d succeeded, %d failed", progress_state.completed, progress_state.failed)
+          vim.notify(msg, progress_state.failed == 0 and vim.log.levels.INFO or vim.log.levels.WARN)
+          
+          if callback then callback() end
+        else
+          -- Start next upload if there's capacity
+          if active_uploads < max_parallel then
+            start_next_upload()
+          end
+        end
+      end)
     end)
+    
+    -- Start more uploads in parallel if possible
+    if active_uploads < max_parallel then
+      start_next_upload()
+    end
   end
   
-  upload_next(1)
+  -- Start initial batch of parallel uploads
+  start_next_upload()
 end
 
-function M.upload_cartridge_zip(dw_config, cartridge_name, callback)
+-- NEW: Truly async upload that doesn't block the main thread
+function M.upload_cartridge_async(dw_config, cartridge_name, callback)
   local cartridges = config_loader.get_cartridges()
   local cartridge = nil
   
@@ -181,76 +200,133 @@ function M.upload_cartridge_zip(dw_config, cartridge_name, callback)
     return
   end
   
+  -- Step 1: Create zip asynchronously
   local zip_file = vim.fn.tempname() .. ".zip"
   local exclude = table.concat(vim.tbl_map(vim.fn.shellescape, M.opts.ignore_patterns or {}), " -x ")
   local zip_cmd = string.format("cd %s && zip -r -q %s * -x %s",
     vim.fn.shellescape(cartridge.path), vim.fn.shellescape(zip_file), exclude)
   
-  vim.fn.jobstart(zip_cmd, {
-    on_exit = function(_, exit_code)
+  local zip_job = vim.fn.jobstart(zip_cmd, {
+    on_exit = vim.schedule_wrap(function(_, exit_code)
       if exit_code ~= 0 then
         callback(false, "Failed to create zip")
         return
       end
       
-      -- Use exact VSCode Prophet zip upload approach
-      local upload_cmd = string.format(
-        "curl -s --max-time 30 -X PUT -H 'Content-Type: application/zip' -u %s:%s --data-binary @%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s_cartridge.zip",
-        vim.fn.shellescape(dw_config.username), vim.fn.shellescape(dw_config.password),
-        vim.fn.shellescape(zip_file), dw_config.hostname, dw_config["code-version"], cartridge_name)
-      
-      vim.fn.jobstart(upload_cmd, {
-        on_exit = function(_, upload_exit_code)
-          if upload_exit_code == 0 then
-            -- Step 2: Unzip the uploaded file (VSCode Prophet approach)
-            local unzip_cmd = string.format(
-              "curl -s --max-time 30 -X POST -H 'Content-Type: application/x-www-form-urlencoded' --data 'method=UNZIP' -u %s:%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s_cartridge.zip",
-              vim.fn.shellescape(dw_config.username), vim.fn.shellescape(dw_config.password),
-              dw_config.hostname, dw_config["code-version"], cartridge_name)
-            
-            vim.fn.jobstart(unzip_cmd, {
-              on_exit = function(_, unzip_exit_code)
-                -- Step 3: Clean up zip file
-                local cleanup_cmd = string.format(
-                  "curl -s --max-time 10 -X DELETE -u %s:%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s_cartridge.zip",
-                  vim.fn.shellescape(dw_config.username), vim.fn.shellescape(dw_config.password),
-                  dw_config.hostname, dw_config["code-version"], cartridge_name)
-                
-                vim.fn.jobstart(cleanup_cmd, {
-                  on_exit = function(_, _)
-                    vim.fn.delete(zip_file) -- Delete local zip file
-                    
-                    if unzip_exit_code == 0 then
-                      callback(true, nil)
-                    else
-                      callback(false, string.format("unzip failed (exit code %d)", unzip_exit_code))
-                    end
-                  end,
-                })
-              end,
-            })
-          else
-            vim.fn.delete(zip_file)
-            
-            -- Provide specific error messages based on curl exit codes
-            if upload_exit_code == 7 then
-              callback(false, "connection failed - cannot reach sandbox")
-            elseif upload_exit_code == 22 then
-              callback(false, "authentication failed - check credentials")
-            elseif upload_exit_code == 28 then
-              callback(false, "timeout - sandbox not responding")
-            elseif upload_exit_code == 6 then
-              callback(false, "couldn't resolve host - check hostname")
-            elseif upload_exit_code == 56 then
-              callback(false, "network receive error - check credentials and WebDAV permissions")
-            else
-              callback(false, string.format("upload failed (exit code %d)", upload_exit_code))
-            end
-          end
-        end,
-      })
-    end,
+      -- Step 2: Upload zip asynchronously
+      M.upload_zip_file_async(dw_config, cartridge_name, zip_file, callback)
+    end),
+    -- Don't capture stdout/stderr to avoid memory issues with large outputs
+    stdout_buffered = false,
+    stderr_buffered = false,
   })
+  
+  if not zip_job or zip_job <= 0 then
+    callback(false, "Failed to start zip process")
+  end
+end
+
+-- NEW: Async zip upload with proper cleanup
+function M.upload_zip_file_async(dw_config, cartridge_name, zip_file, callback)
+  local upload_cmd = string.format(
+    "curl -s --max-time 30 -X PUT -H 'Content-Type: application/zip' -u %s:%s --data-binary @%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s_cartridge.zip",
+    vim.fn.shellescape(dw_config.username), vim.fn.shellescape(dw_config.password),
+    vim.fn.shellescape(zip_file), dw_config.hostname, dw_config["code-version"], cartridge_name)
+  
+  local upload_job = vim.fn.jobstart(upload_cmd, {
+    on_exit = vim.schedule_wrap(function(_, upload_exit_code)
+      if upload_exit_code == 0 then
+        -- Step 3: Unzip on server asynchronously
+        M.unzip_on_server_async(dw_config, cartridge_name, zip_file, callback)
+      else
+        vim.fn.delete(zip_file)
+        
+        -- Provide specific error messages based on curl exit codes
+        local error_msg = "upload failed"
+        if upload_exit_code == 7 then
+          error_msg = "connection failed - cannot reach sandbox"
+        elseif upload_exit_code == 22 then
+          error_msg = "authentication failed - check credentials"
+        elseif upload_exit_code == 28 then
+          error_msg = "timeout - sandbox not responding"
+        elseif upload_exit_code == 6 then
+          error_msg = "couldn't resolve host - check hostname"
+        elseif upload_exit_code == 56 then
+          error_msg = "network receive error - check credentials and WebDAV permissions"
+        end
+        
+        callback(false, error_msg)
+      end
+    end),
+    stdout_buffered = false,
+    stderr_buffered = false,
+  })
+  
+  if not upload_job or upload_job <= 0 then
+    vim.fn.delete(zip_file)
+    callback(false, "Failed to start upload process")
+  end
+end
+
+-- NEW: Async server-side unzip
+function M.unzip_on_server_async(dw_config, cartridge_name, zip_file, callback)
+  local unzip_cmd = string.format(
+    "curl -s --max-time 30 -X POST -H 'Content-Type: application/x-www-form-urlencoded' --data 'method=UNZIP' -u %s:%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s_cartridge.zip",
+    vim.fn.shellescape(dw_config.username), vim.fn.shellescape(dw_config.password),
+    dw_config.hostname, dw_config["code-version"], cartridge_name)
+  
+  local unzip_job = vim.fn.jobstart(unzip_cmd, {
+    on_exit = vim.schedule_wrap(function(_, unzip_exit_code)
+      -- Step 4: Cleanup zip file on server asynchronously
+      M.cleanup_server_zip_async(dw_config, cartridge_name, zip_file, unzip_exit_code == 0, callback)
+    end),
+    stdout_buffered = false,
+    stderr_buffered = false,
+  })
+  
+  if not unzip_job or unzip_job <= 0 then
+    vim.fn.delete(zip_file)
+    callback(false, "Failed to start unzip process")
+  end
+end
+
+-- NEW: Async server cleanup
+function M.cleanup_server_zip_async(dw_config, cartridge_name, zip_file, unzip_success, callback)
+  local cleanup_cmd = string.format(
+    "curl -s --max-time 10 -X DELETE -u %s:%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s_cartridge.zip",
+    vim.fn.shellescape(dw_config.username), vim.fn.shellescape(dw_config.password),
+    dw_config.hostname, dw_config["code-version"], cartridge_name)
+  
+  local cleanup_job = vim.fn.jobstart(cleanup_cmd, {
+    on_exit = vim.schedule_wrap(function(_, _)
+      -- Always delete local zip file
+      vim.fn.delete(zip_file)
+      
+      if unzip_success then
+        callback(true, nil)
+      else
+        callback(false, "unzip failed on server")
+      end
+    end),
+    stdout_buffered = false,
+    stderr_buffered = false,
+  })
+  
+  if not cleanup_job or cleanup_job <= 0 then
+    vim.fn.delete(zip_file)
+    callback(unzip_success, unzip_success and nil or "unzip failed, cleanup also failed")
+  end
+end
+
+-- LEGACY: Keep old sequential function for compatibility
+function M.upload_cartridges(dw_config, cartridge_names, opts, callback)
+  -- Redirect to new parallel implementation
+  M.upload_cartridges_parallel(dw_config, cartridge_names, opts, callback)
+end
+
+function M.upload_cartridge_zip(dw_config, cartridge_name, callback)
+  -- Redirect to new async implementation
+  M.upload_cartridge_async(dw_config, cartridge_name, callback)
 end
 
 return M

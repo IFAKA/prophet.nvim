@@ -109,7 +109,7 @@ vim.api.nvim_create_user_command("ProphetStatus", function()
     -- Open in a split
     vim.cmd("split")
     vim.api.nvim_win_set_buf(0, buf)
-    vim.api.nvim_buf_set_name(buf, "Prophet Status")
+    vim.api.nvim_buf_set_name(buf, "Prophet Status " .. os.time())
     
     -- Check sandbox status asynchronously and update buffer
     config_loader.check_sandbox_status(dw_config, function(success, message)
@@ -133,7 +133,7 @@ vim.api.nvim_create_user_command("ProphetStatus", function()
     -- Open in a split
     vim.cmd("split")
     vim.api.nvim_win_set_buf(0, buf)
-    vim.api.nvim_buf_set_name(buf, "Prophet Status")
+    vim.api.nvim_buf_set_name(buf, "Prophet Status " .. os.time())
   end
 end, { desc = "Prophet: Show Status" })
 
