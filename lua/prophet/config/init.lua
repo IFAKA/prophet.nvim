@@ -1,5 +1,19 @@
 local M = {}
 
+local function is_cartridge_project(project_file)
+  if vim.fn.filereadable(project_file) ~= 1 then
+    return false
+  end
+  
+  local file = io.open(project_file, "r")
+  if not file then return false end
+  
+  local content = file:read("*a")
+  file:close()
+  
+  return content:find("com%.demandware%.studio%.core%.beehiveNature") ~= nil
+end
+
 local function find_dw_config()
   local cwd = vim.fn.getcwd()
   for _, file in ipairs({ "dw.json", "dw.js" }) do
@@ -86,20 +100,6 @@ function M.load()
   end
   
   return normalize_config(config)
-end
-
-local function is_cartridge_project(project_file)
-  if vim.fn.filereadable(project_file) ~= 1 then
-    return false
-  end
-  
-  local file = io.open(project_file, "r")
-  if not file then return false end
-  
-  local content = file:read("*a")
-  file:close()
-  
-  return content:find("com%.demandware%.studio%.core%.beehiveNature") ~= nil
 end
 
 function M.get_cartridges()
