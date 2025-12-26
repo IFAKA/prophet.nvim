@@ -39,3 +39,26 @@ end, {
     return names
   end,
 })
+
+-- Setup keymaps (works with which-key)
+-- These will auto-register if which-key is installed
+vim.schedule(function()
+  local has_wk, wk = pcall(require, "which-key")
+  
+  if has_wk then
+    -- Register with which-key (VimZap style)
+    wk.add({
+      { "<leader>p", group = "prophet" },
+      { "<leader>pe", "<cmd>ProphetEnable<cr>", desc = "enable auto-upload" },
+      { "<leader>pd", "<cmd>ProphetDisable<cr>", desc = "disable auto-upload" },
+      { "<leader>pt", "<cmd>ProphetToggle<cr>", desc = "toggle auto-upload" },
+      { "<leader>pc", "<cmd>ProphetClean<cr>", desc = "clean upload all" },
+    })
+  else
+    -- Fallback: set keymaps directly
+    vim.keymap.set("n", "<leader>pe", "<cmd>ProphetEnable<cr>", { desc = "Prophet: Enable auto-upload" })
+    vim.keymap.set("n", "<leader>pd", "<cmd>ProphetDisable<cr>", { desc = "Prophet: Disable auto-upload" })
+    vim.keymap.set("n", "<leader>pt", "<cmd>ProphetToggle<cr>", { desc = "Prophet: Toggle auto-upload" })
+    vim.keymap.set("n", "<leader>pc", "<cmd>ProphetClean<cr>", { desc = "Prophet: Clean upload all" })
+  end
+end)

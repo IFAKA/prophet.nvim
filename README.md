@@ -100,16 +100,20 @@ Place this file in your project root (where your `*_cartridges` folders are).
 :ProphetDisable " Stop watching
 ```
 
-### Keymaps (Optional)
+### Keymaps
 
-Add to your Neovim config:
+Prophet.nvim **automatically sets up keybindings**:
 
-```lua
-vim.keymap.set("n", "<leader>pe", "<cmd>ProphetEnable<cr>", { desc = "Prophet: Enable auto-upload" })
-vim.keymap.set("n", "<leader>pd", "<cmd>ProphetDisable<cr>", { desc = "Prophet: Disable auto-upload" })
-vim.keymap.set("n", "<leader>pt", "<cmd>ProphetToggle<cr>", { desc = "Prophet: Toggle auto-upload" })
-vim.keymap.set("n", "<leader>pc", "<cmd>ProphetClean<cr>", { desc = "Prophet: Clean upload all" })
-```
+| Keymap | Command | Description |
+|--------|---------|-------------|
+| `<leader>pe` | `:ProphetEnable` | Enable auto-upload |
+| `<leader>pd` | `:ProphetDisable` | Disable auto-upload |
+| `<leader>pt` | `:ProphetToggle` | Toggle auto-upload |
+| `<leader>pc` | `:ProphetClean` | Clean upload all |
+
+**Which-Key Integration**: If you use which-key (like VimZap does), press `<leader>p` to see all Prophet commands in a menu.
+
+**No configuration needed** - keymaps work out of the box!
 
 ## How It Works
 

@@ -34,17 +34,10 @@ return {
       end,
     },
   },
-  
-  -- Optional: Add keymaps
-  keymaps = {
-    -- Prophet keymaps (using <leader>p prefix)
-    { "n", "<leader>pe", "<cmd>ProphetEnable<cr>", { desc = "Prophet: Enable auto-upload" } },
-    { "n", "<leader>pd", "<cmd>ProphetDisable<cr>", { desc = "Prophet: Disable auto-upload" } },
-    { "n", "<leader>pt", "<cmd>ProphetToggle<cr>", { desc = "Prophet: Toggle auto-upload" } },
-    { "n", "<leader>pc", "<cmd>ProphetClean<cr>", { desc = "Prophet: Clean upload all" } },
-  },
 }
 ```
+
+**Note**: Keymaps are **automatically set up** by the plugin! No need to manually add them.
 
 ### 2. Or use VimZap's standard plugin directory
 
@@ -100,26 +93,39 @@ return {
           notify = true,
         })
       end,
-      keys = {
-        { "<leader>pe", "<cmd>ProphetEnable<cr>", desc = "Prophet: Enable auto-upload" },
-        { "<leader>pd", "<cmd>ProphetDisable<cr>", desc = "Prophet: Disable auto-upload" },
-        { "<leader>pt", "<cmd>ProphetToggle<cr>", desc = "Prophet: Toggle auto-upload" },
-        { "<leader>pc", "<cmd>ProphetClean<cr>", desc = "Prophet: Clean upload all" },
-      },
+      -- Keymaps are automatically set up!
+      -- Press <leader>p to see all Prophet commands in which-key
     },
   },
 }
 ```
 
+## Which-Key Integration
+
+Prophet.nvim **automatically registers** with which-key (used by VimZap):
+
+Press `<leader>p` to see the Prophet menu:
+
+```
+┌ prophet ──────────────────────┐
+│ pe  enable auto-upload        │
+│ pd  disable auto-upload       │
+│ pt  toggle auto-upload        │
+│ pc  clean upload all          │
+└───────────────────────────────┘
+```
+
+**No manual setup required!** The plugin detects which-key and auto-registers.
+
 ## VimZap Command Menu Integration
 
-Prophet commands appear in VimZap's command palette (`<Space>`):
+Prophet commands also appear in VimZap's command palette (`<leader>sc`):
 
-Press `<Space>` then type "Prophet" to see:
-- Prophet: Enable auto-upload
-- Prophet: Disable auto-upload
-- Prophet: Toggle auto-upload
-- Prophet: Clean upload all
+Search for "Prophet" to see:
+- ProphetEnable: Enable auto-upload
+- ProphetDisable: Disable auto-upload
+- ProphetToggle: Toggle auto-upload
+- ProphetClean: Clean upload all
 
 ## SFRA Project Detection
 
