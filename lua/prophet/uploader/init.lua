@@ -84,6 +84,7 @@ function M.upload_cartridges(dw_config, names, opts, callback)
   local total, completed, failed = #names, 0, 0
   local active, idx = 0, 1
   local current = {}
+  local start_next
 
   local function notify_progress()
     if not opts.notify then return end
@@ -118,7 +119,7 @@ function M.upload_cartridges(dw_config, names, opts, callback)
     end)
   end
 
-  local function start_next()
+  start_next = function()
     while active < MAX_PARALLEL and idx <= #names do
       local name = names[idx]
       idx = idx + 1
