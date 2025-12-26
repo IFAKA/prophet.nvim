@@ -27,20 +27,65 @@ local function parse_json_file(filepath)
   return decoded
 end
 
+local function validate_config(config)
+  local required_fields = { "hostname", "username", "password" }
+  local missing = {}
+  
+  for _, field in ipairs(required_fields) do
+    if not config[field] or config[field] == "" then
+      table.insert(missing, field)
+    end
+  end
+  
+  if #missing > 0 then
+    vim.notify("Prophet: dw.json missing required fields: " .. table.concat(missing, ", "), vim.log.levels.ERROR)
+    return false
+  end
+  
+  -- Validate hostname format
+  if not config.hostname:match("^[%w%-%.]+$") then
+    vim.notify("Prophet: Invalid hostname format in dw.json", vim.log.levels.ERROR)
+    return false
+  end
+  
+  return true
+end
+
+local function normalize_config(config)
+  -- Set defaults
+  config["code-version"] = config["code-version"] or "version1"
+  config.cartridge = config.cartridge or {}
+  config.cartridgePath = config.cartridgePath or ""
+  
+  -- Normalize cartridge paths if specified
+  if config.cartridgePath and config.cartridgePath ~= "" then
+    config.cartridge = vim.split(config.cartridgePath, ":", { plain = true })
+  end
+  
+  -- Ensure arrays
+  if type(config.cartridge) == "string" then
+    config.cartridge = { config.cartridge }
+  end
+  
+  return config
+end
+
 function M.load()
   local config_path = find_dw_config()
-  if not config_path then return nil end
+  if not config_path then 
+    return nil 
+  end
   
   local config = parse_json_file(config_path)
-  if not config then return nil end
+  if not config then 
+    return nil 
+  end
   
-  if not (config.hostname and config.username and config.password) then
-    vim.notify("Prophet: dw.json missing required fields", vim.log.levels.ERROR)
+  if not validate_config(config) then
     return nil
   end
   
-  config["code-version"] = config["code-version"] or "version1"
-  return config
+  return normalize_config(config)
 end
 
 local function is_cartridge_project(project_file)

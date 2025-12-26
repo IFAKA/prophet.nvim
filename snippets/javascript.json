@@ -1,0 +1,161 @@
+{
+  "controller": {
+    "prefix": "controller",
+    "body": [
+      "'use strict';",
+      "",
+      "var server = require('server');",
+      "",
+      "server.get('${1:Action}', function (req, res, next) {",
+      "\t$0",
+      "\tnext();",
+      "});",
+      "",
+      "module.exports = server.exports();"
+    ],
+    "description": "Basic SFCC controller structure"
+  },
+  "require-dw": {
+    "prefix": "req-dw",
+    "body": [
+      "var ${2:${1/dw\\.(.*)/$1/}} = require('dw.${1:system.System}');"
+    ],
+    "description": "Require DW API module"
+  },
+  "require-cartridge": {
+    "prefix": "req-cart",
+    "body": [
+      "var ${2:moduleName} = require('~/${1:modulePath}');"
+    ],
+    "description": "Require cartridge module"
+  },
+  "require-base": {
+    "prefix": "req-base",
+    "body": [
+      "var ${2:moduleName} = require('*/${1:modulePath}');"
+    ],
+    "description": "Require base cartridge module"
+  },
+  "middleware": {
+    "prefix": "middleware",
+    "body": [
+      "server.${1:use}('${2:Middleware}', function (req, res, next) {",
+      "\t$0",
+      "\tnext();",
+      "});"
+    ],
+    "description": "Server middleware"
+  },
+  "resource-msg": {
+    "prefix": "resource",
+    "body": [
+      "Resource.msg('${1:key}', '${2:bundle}', null)"
+    ],
+    "description": "Resource message"
+  },
+  "urlutils": {
+    "prefix": "url",
+    "body": [
+      "URLUtils.url('${1:endpoint}')"
+    ],
+    "description": "URL generation"
+  },
+  "logger": {
+    "prefix": "logger",
+    "body": [
+      "var Logger = require('dw/system/Logger');",
+      "var logger = Logger.getLogger('${1:category}', '${2:subcategory}');"
+    ],
+    "description": "Logger setup"
+  },
+  "transaction": {
+    "prefix": "transaction",
+    "body": [
+      "var Transaction = require('dw/system/Transaction');",
+      "",
+      "Transaction.wrap(function () {",
+      "\t$0",
+      "});"
+    ],
+    "description": "Transaction wrapper"
+  },
+  "model-extend": {
+    "prefix": "model-extend",
+    "body": [
+      "'use strict';",
+      "",
+      "var base = module.superModule;",
+      "",
+      "/**",
+      " * ${1:Description}",
+      " */",
+      "function ${2:functionName}() {",
+      "\tbase.${2:functionName}.apply(this, arguments);",
+      "\t$0",
+      "}",
+      "",
+      "module.exports = ${2:functionName};"
+    ],
+    "description": "Model extension pattern"
+  },
+  "script-extend": {
+    "prefix": "script-extend",
+    "body": [
+      "'use strict';",
+      "",
+      "var base = module.superModule;",
+      "",
+      "/**",
+      " * ${1:Description}",
+      " */",
+      "function ${2:functionName}(${3:params}) {",
+      "\t$0",
+      "\treturn base.${2:functionName}.call(this, ${3:params});",
+      "}",
+      "",
+      "module.exports.${2:functionName} = ${2:functionName};"
+    ],
+    "description": "Script extension pattern"
+  },
+  "decorator": {
+    "prefix": "decorator",
+    "body": [
+      "'use strict';",
+      "",
+      "/**",
+      " * Decorator for ${1:description}",
+      " * @param {Object} object - object to decorate",
+      " * @returns {Object} decorated object",
+      " */",
+      "module.exports = function (object) {",
+      "\tObject.defineProperty(object, '${2:property}', {",
+      "\t\tenumerable: true,",
+      "\t\tvalue: ${3:value}",
+      "\t});",
+      "",
+      "\treturn object;",
+      "};"
+    ],
+    "description": "Object decorator"
+  },
+  "factory": {
+    "prefix": "factory",
+    "body": [
+      "'use strict';",
+      "",
+      "/**",
+      " * Factory for ${1:description}",
+      " * @param {Object} params - parameters",
+      " * @returns {Object} created object",
+      " */",
+      "function create${2:ObjectName}(params) {",
+      "\treturn {",
+      "\t\t$0",
+      "\t};",
+      "}",
+      "",
+      "module.exports.create${2:ObjectName} = create${2:ObjectName};"
+    ],
+    "description": "Factory function"
+  }
+}
