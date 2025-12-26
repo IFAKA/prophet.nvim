@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="banner.png" alt="Prophet.nvim Banner" width="100%">
-</p>
+<img width="2560" height="1280" alt="image" src="https://github.com/user-attachments/assets/2c1e8c01-69c5-42eb-af17-87a898b4782b" />
 
 # Prophet.nvim
 
