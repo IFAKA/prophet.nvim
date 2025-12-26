@@ -39,7 +39,3 @@ end, {
     return names
   end,
 })
-
--- Keymaps are NOT set by default to avoid conflicts
--- Users can set them via the setup() function or manually
--- See :h prophet-keymaps for recommended keybindings

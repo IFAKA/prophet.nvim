@@ -1,18 +1,23 @@
 # Prophet.nvim
 
-**SFCC cartridge uploader for Neovim** - Upload cartridges to Salesforce Commerce Cloud sandboxes with real-time progress feedback.
+**SFCC Cartridge Uploader for Neovim** - Upload cartridges to Salesforce Commerce Cloud sandboxes.
 
-Zero configuration. Reads from your existing `dw.json`. Shows upload progress like `4/72`.
+> **Scope:** Upload functionality only. For debugging, ISML syntax, and logs, use the [VSCode Prophet extension](https://github.com/SqrTT/prophet).
 
-## Features
+## What This Does
 
-- Upload cartridges to SFCC sandboxes via WebDAV
-- Auto-upload on file save (optional)
-- Real-time progress notifications (`Uploading 4/72: app_storefront_core`)
-- Reads configuration from existing `dw.json` (no extra setup needed)
-- Clean upload all cartridges at once
-- File watching with smart debouncing
-- Ignore patterns support (node_modules, .git, etc.)
+- ✅ Upload cartridges to SFCC sandboxes via WebDAV
+- ✅ Auto-upload on file save (optional)
+- ✅ Clean upload all cartridges
+- ✅ Progress notifications
+- ✅ Reads existing `dw.json` configuration
+
+## What This Doesn't Do
+
+- ❌ Debugger (use VSCode Prophet)
+- ❌ ISML syntax highlighting (use treesitter)
+- ❌ Server logs viewer (use VSCode Prophet)
+- ❌ ISML validation/formatting
 
 ## Requirements
 
@@ -23,52 +28,32 @@ Zero configuration. Reads from your existing `dw.json`. Shows upload progress li
 
 ## Installation
 
-### VimZap (Pre-installed!)
-
-Prophet.nvim comes **pre-installed** with [VimZap](https://github.com/IFAKA/vimzap):
-
-```bash
-curl -fsSL ifaka.github.io/vimzap/i | bash
-```
-
-Keymaps and configuration are already set up - just use it!
-
-### Other Distributions
-
-See [INSTALLATION.md](INSTALLATION.md) for:
-- LazyVim
-- NvChad
-- AstroNvim
-- Vanilla Neovim (lazy.nvim, packer, vim-plug)
-- Manual installation
-
-**Quick setup (lazy.nvim):**
+### lazy.nvim
 
 ```lua
 {
   "IFAKA/prophet.nvim",
-  lazy = false,
   config = function()
-    require("prophet").setup({
-      keymaps = true,  -- Enable default keymaps
-    })
+    require("prophet").setup()
   end,
 }
 ```
 
 ## Configuration
 
-Prophet.nvim reads your existing `dw.json` file. Minimal configuration needed!
+### Minimal Setup
 
-### Default Settings
+```lua
+require("prophet").setup()
+```
+
+### Full Options
 
 ```lua
 require("prophet").setup({
-  auto_upload = false,       -- Don't watch files by default
-  clean_on_start = true,     -- Upload all cartridges on startup  
-  notify = true,             -- Show progress notifications
-  progress_style = "float",  -- Floating window style
-  keymaps = false,           -- Keymaps are opt-in (see below)
+  auto_upload = false,    -- Auto-upload on save
+  clean_on_start = true,  -- Upload all on startup
+  notify = true,          -- Show notifications
   ignore_patterns = {
     "node_modules",
     "%.git",
@@ -77,7 +62,9 @@ require("prophet").setup({
 })
 ```
 
-### Example `dw.json`
+### dw.json Example
+
+Place in your project root:
 
 ```json
 {
@@ -88,161 +75,110 @@ require("prophet").setup({
 }
 ```
 
-Place this file in your project root (where your `*_cartridges` folders are).
-
-## Usage
-
-### Commands
+## Commands
 
 | Command | Description |
 |---------|-------------|
-| `:ProphetEnable` | Enable auto-upload on file save |
+| `:ProphetEnable` | Enable auto-upload on save |
 | `:ProphetDisable` | Disable auto-upload |
-| `:ProphetToggle` | Toggle auto-upload on/off |
-| `:ProphetClean` | Clean upload all cartridges |
-| `:ProphetUpload <name>` | Upload a specific cartridge |
+| `:ProphetToggle` | Toggle auto-upload |
+| `:ProphetClean` | Upload all cartridges |
+| `:ProphetUpload <name>` | Upload specific cartridge |
 
-### Example Workflow
+## Keymaps
 
-**Option 1: Manual Upload (Recommended for Production)**
+**No default keymaps** - set your own:
+
+```lua
+vim.keymap.set("n", "<leader>pe", "<cmd>ProphetEnable<cr>", { desc = "Enable SFCC upload" })
+vim.keymap.set("n", "<leader>pd", "<cmd>ProphetDisable<cr>", { desc = "Disable SFCC upload" })
+vim.keymap.set("n", "<leader>pt", "<cmd>ProphetToggle<cr>", { desc = "Toggle SFCC upload" })
+vim.keymap.set("n", "<leader>pc", "<cmd>ProphetClean<cr>", { desc = "Upload all cartridges" })
+```
+
+Or use commands directly via `:Prophet<Tab>`.
+
+## Usage
+
+### Manual Upload
 
 ```vim
 :ProphetClean  " Upload all cartridges once
 ```
 
-**Option 2: Auto Upload (Development)**
+### Auto Upload (Development)
 
 ```vim
 :ProphetEnable  " Start watching files
-" Now edit any file and save - it auto-uploads!
+" Edit and save files - they auto-upload
 :ProphetDisable " Stop watching
-```
-
-### Keymaps (Opt-in)
-
-Prophet.nvim **does NOT set keymaps by default** to avoid conflicts. You have 3 options:
-
-**Option 1: Enable default keymaps** (uses `<leader>p` prefix)
-
-```lua
-require("prophet").setup({
-  keymaps = true,  -- Enable default keymaps
-})
-```
-
-This sets up:
-- `<leader>pe` → Enable auto-upload
-- `<leader>pd` → Disable auto-upload
-- `<leader>pt` → Toggle auto-upload
-- `<leader>pc` → Clean upload all
-
-**Option 2: Set your own keymaps** (recommended)
-
-```lua
-require("prophet").setup()
-
--- Then add your own keymaps
-vim.keymap.set("n", "<leader>pe", "<cmd>ProphetEnable<cr>", { desc = "Prophet: Enable" })
-vim.keymap.set("n", "<leader>pd", "<cmd>ProphetDisable<cr>", { desc = "Prophet: Disable" })
-vim.keymap.set("n", "<leader>pt", "<cmd>ProphetToggle<cr>", { desc = "Prophet: Toggle" })
-vim.keymap.set("n", "<leader>pc", "<cmd>ProphetClean<cr>", { desc = "Prophet: Clean" })
-```
-
-**Option 3: Use commands only** (no keymaps)
-
-Just use `:ProphetClean`, `:ProphetToggle`, etc. directly.
-
-## How It Works
-
-1. **Detects cartridges**: Scans for `*_cartridges` directories in your project
-2. **Watches for changes**: Uses Neovim's built-in file watcher when auto-upload is enabled
-3. **Zips cartridges**: Creates temporary zip files with smart ignore patterns
-4. **Uploads via WebDAV**: Uses SFCC's WebDAV API to upload to your sandbox
-5. **Shows progress**: Displays real-time upload progress in a floating window
-
-### Progress Notification
-
-When uploading multiple cartridges, you'll see:
-
-```
-╭─────────────────────────────────────╮
-│ Prophet Upload Progress             │
-├─────────────────────────────────────┤
-│ Uploading 4/72: app_storefront_core │
-│ ████████████░░░░░░░░░░░░░░░░░░░░░░░ │
-╰─────────────────────────────────────╯
 ```
 
 ## Project Structure
 
-Prophet.nvim expects your SFRA project to follow this structure:
-
 ```
 your-project/
-├── dw.json                    # SFCC configuration
+├── dw.json                    # SFCC credentials
 ├── animalis_cartridges/       # Cartridge folder
 │   ├── app_custom_animalis/   # Individual cartridge
 │   └── int_custom_payment/
-├── kiwoko_cartridges/
-│   └── app_custom_kiwoko/
-└── site_kiwoko/
-    └── cartridges/
+└── kiwoko_cartridges/
+    └── app_custom_kiwoko/
 ```
 
-The plugin automatically detects all `*_cartridges` directories and their subdirectories.
+## Comparison: Prophet.nvim vs VSCode Prophet
 
-## Comparison with VSCode Prophet
-
-| Feature | VSCode Prophet | prophet.nvim |
-|---------|---------------|--------------|
+| Feature | prophet.nvim | VSCode Prophet |
+|---------|--------------|----------------|
 | Upload cartridges | ✅ | ✅ |
 | Auto-upload on save | ✅ | ✅ |
 | Progress feedback | ✅ | ✅ |
-| Debugger | ✅ | ❌ |
-| ISML syntax | ✅ | ❌ |
-| Logs viewer | ✅ | ❌ |
+| Debugger | ❌ | ✅ |
+| ISML syntax | ❌ | ✅ |
+| Logs viewer | ❌ | ✅ |
+| Cartridges explorer | ❌ | ✅ |
+| SOAP API download | ❌ | ✅ |
 
-**Note**: Prophet.nvim focuses on **cartridge uploading only**. For debugging and ISML support, consider using VSCode with the original Prophet extension.
+**Use both:** Edit in Neovim, debug in VSCode. They share the same `dw.json`.
 
 ## Troubleshooting
 
 ### No cartridges found
 
-Make sure your project has folders ending with `_cartridges` and they contain subdirectories with a `.project` file or `cartridge/` directory.
+Ensure folders ending with `_cartridges` contain subdirectories with `.project` file or `cartridge/` directory.
 
 ### Upload fails
 
-- Check your `dw.json` credentials
-- Verify your sandbox is accessible
+- Check `dw.json` credentials
+- Verify sandbox is accessible
 - Ensure `curl` and `zip` are installed: `which curl zip`
-- Check Neovim messages: `:messages`
+- Check messages: `:messages`
 
 ### Auto-upload not working
 
 - Verify it's enabled: `:ProphetEnable`
-- Check file watching is active (you'll see a notification)
-- Make sure your file is inside a `*_cartridges` directory
+- Check file is inside a `*_cartridges` directory
+- See messages: `:messages`
 
 ## FAQ
 
-**Q: Does this work with multi-workspace projects?**
-A: Yes! Place your `dw.json` in the root where your cartridge folders are.
+**Q: Why doesn't this have debugging?**
+A: Debugging requires complex SDAPI 2.0 integration. Use VSCode Prophet for debugging.
 
-**Q: Can I use this with the original Prophet VSCode extension?**
-A: Yes! They both read the same `dw.json` file. Use VSCode for debugging and Neovim for editing.
+**Q: Can I use this with VSCode Prophet?**
+A: Yes! They both read `dw.json`. Edit in Neovim, debug in VSCode.
 
-**Q: Does it support `dw.js` files?**
-A: Currently only `dw.json` is fully supported. `dw.js` support is planned.
+**Q: Why no ISML syntax highlighting?**
+A: Use Neovim's treesitter for syntax highlighting. Prophet.nvim focuses on uploads only.
 
 **Q: How do I see which cartridges will be uploaded?**
 A: Run `:lua print(vim.inspect(require('prophet.config').get_cartridges()))`
 
 ## Contributing
 
-PRs welcome! This plugin is focused on **upload functionality only**.
+PRs welcome for **upload functionality** improvements only.
 
-For feature requests or bugs, please open an issue at:
-https://github.com/IFAKA/prophet.nvim/issues
+For feature requests or bugs: https://github.com/IFAKA/prophet.nvim/issues
 
 ## License
 
@@ -250,8 +186,8 @@ MIT
 
 ## Credits
 
-Inspired by the excellent [Prophet VSCode extension](https://github.com/SqrTT/prophet) by SqrTT.
+Inspired by [Prophet VSCode extension](https://github.com/SqrTT/prophet) by SqrTT.
 
 ---
 
-**Made with ❤️ for SFCC developers who prefer Neovim**
+**Made for SFCC developers who prefer Neovim's speed for editing**
