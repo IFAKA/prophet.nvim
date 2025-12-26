@@ -103,13 +103,36 @@ function M.load()
   return normalize_config(config)
 end
 
+-- Cache cartridges to avoid repeated slow scans
+local cartridge_cache = nil
+local cache_cwd = nil
+
 function M.get_cartridges()
   local cwd = vim.fn.getcwd()
+
+  -- Return cached result if same directory
+  if cartridge_cache and cache_cwd == cwd then
+    return cartridge_cache
+  end
+
   local cartridges = {}
-  
-  -- First, look for the SqrTT/prophet pattern: find all .project files recursively
-  local project_files = vim.fn.glob(cwd .. "/**/.project", false, true)
-  
+
+  -- Use find command with exclusions (much faster than vim.fn.glob)
+  local excludes = {
+    "node_modules", ".git", "dist", "build", ".next", ".nuxt",
+    "coverage", ".cache", "tmp", ".tmp", "logs", "vendor", ".svn",
+  }
+  local exclude_args = {}
+  for _, dir in ipairs(excludes) do
+    table.insert(exclude_args, string.format("-not -path '*/%s/*'", dir))
+  end
+  local find_cmd = string.format(
+    "find %s -name '.project' -type f %s 2>/dev/null",
+    vim.fn.shellescape(cwd), table.concat(exclude_args, " ")
+  )
+  local result = vim.fn.system(find_cmd)
+  local project_files = vim.split(result, "\n", { trimempty = true })
+
   for _, project_file in ipairs(project_files) do
     if is_cartridge_project(project_file) then
       local cartridge_dir = vim.fn.fnamemodify(project_file, ":h")
@@ -117,7 +140,7 @@ function M.get_cartridges()
       table.insert(cartridges, { name = name, path = cartridge_dir })
     end
   end
-  
+
   -- Fallback: also check the old pattern for backwards compatibility
   if #cartridges == 0 then
     for _, dir in ipairs(vim.fn.glob(cwd .. "/*_cartridges", false, true)) do
@@ -125,7 +148,7 @@ function M.get_cartridges()
         for _, subdir in ipairs(vim.fn.glob(dir .. "/*", false, true)) do
           if vim.fn.isdirectory(subdir) == 1 then
             local name = vim.fn.fnamemodify(subdir, ":t")
-            if vim.fn.filereadable(subdir .. "/.project") == 1 or 
+            if vim.fn.filereadable(subdir .. "/.project") == 1 or
                vim.fn.isdirectory(subdir .. "/cartridge") == 1 then
               table.insert(cartridges, { name = name, path = subdir })
             end
@@ -134,8 +157,18 @@ function M.get_cartridges()
       end
     end
   end
-  
+
+  -- Cache result
+  cartridge_cache = cartridges
+  cache_cwd = cwd
+
   return cartridges
+end
+
+-- Clear cache (call when cartridges might have changed)
+function M.clear_cache()
+  cartridge_cache = nil
+  cache_cwd = nil
 end
 
 function M.check_sandbox_status(dw_config, callback)

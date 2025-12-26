@@ -13,6 +13,11 @@ local progress_state = {
   current_items = {}
 }
 
+-- Match VSCode Prophet performance settings
+local MAX_PARALLEL_UPLOADS = 4  -- VSCode uses 4
+local MAX_RETRIES = 3           -- VSCode uses 3 retries
+local RETRY_DELAYS = { 2000, 4000, 6000 }  -- Exponential backoff in ms
+
 function M.init(dw_config, opts)
   M.dw_config = dw_config
   M.opts = opts
@@ -123,7 +128,7 @@ function M.upload_cartridges_parallel(dw_config, cartridge_names, opts, callback
   utils.init_progress_display(progress_state.total)
   
   local active_uploads = 0
-  local max_parallel = math.min(3, #cartridge_names) -- Limit parallel uploads to avoid overwhelming sandbox
+  local max_parallel = math.min(MAX_PARALLEL_UPLOADS, #cartridge_names)
   local upload_index = 1
   
   local function start_next_upload()
@@ -186,50 +191,80 @@ function M.upload_cartridges_parallel(dw_config, cartridge_names, opts, callback
   start_next_upload()
 end
 
--- NEW: Truly async upload that doesn't block the main thread
-function M.upload_cartridge_async(dw_config, cartridge_name, callback)
+-- Upload with retry logic (matches VSCode Prophet behavior)
+function M.upload_cartridge_async(dw_config, cartridge_name, callback, retry_count)
+  retry_count = retry_count or 0
+
   local cartridges = config_loader.get_cartridges()
   local cartridge = nil
-  
+
   for _, c in ipairs(cartridges) do
     if c.name == cartridge_name then cartridge = c break end
   end
-  
+
   if not cartridge then
     callback(false, "Cartridge not found")
     return
   end
-  
+
   -- Step 1: Create zip asynchronously
   local zip_file = vim.fn.tempname() .. ".zip"
   local exclude = table.concat(vim.tbl_map(vim.fn.shellescape, M.opts.ignore_patterns or {}), " -x ")
   local zip_cmd = string.format("cd %s && zip -r -q %s * -x %s",
     vim.fn.shellescape(cartridge.path), vim.fn.shellescape(zip_file), exclude)
-  
+
   local zip_job = vim.fn.jobstart(zip_cmd, {
     on_exit = vim.schedule_wrap(function(_, exit_code)
       if exit_code ~= 0 then
         callback(false, "Failed to create zip")
         return
       end
-      
-      -- Step 2: Upload zip asynchronously
-      M.upload_zip_file_async(dw_config, cartridge_name, zip_file, callback)
+
+      -- Step 2: Upload zip with retry wrapper
+      M.upload_zip_with_retry(dw_config, cartridge_name, zip_file, callback, retry_count)
     end),
-    -- Don't capture stdout/stderr to avoid memory issues with large outputs
     stdout_buffered = false,
     stderr_buffered = false,
   })
-  
+
   if not zip_job or zip_job <= 0 then
     callback(false, "Failed to start zip process")
   end
 end
 
--- NEW: Async zip upload with proper cleanup
+-- Retry wrapper for upload operations
+function M.upload_zip_with_retry(dw_config, cartridge_name, zip_file, callback, retry_count)
+  M.upload_zip_file_async(dw_config, cartridge_name, zip_file, function(success, err)
+    if success then
+      callback(true, nil)
+    elseif retry_count < MAX_RETRIES and M.is_retryable_error(err) then
+      -- Retry with exponential backoff
+      local delay = RETRY_DELAYS[retry_count + 1] or 6000
+      vim.defer_fn(function()
+        -- Create new zip for retry (old one was deleted on failure)
+        M.upload_cartridge_async(dw_config, cartridge_name, callback, retry_count + 1)
+      end, delay)
+    else
+      callback(false, err)
+    end
+  end)
+end
+
+-- Check if error is retryable (not auth failures)
+function M.is_retryable_error(err)
+  if not err then return true end
+  -- Don't retry auth failures or host resolution errors
+  local non_retryable = { "authentication", "credentials", "resolve host" }
+  for _, pattern in ipairs(non_retryable) do
+    if string.find(err:lower(), pattern) then return false end
+  end
+  return true
+end
+
+-- Async zip upload with proper cleanup
 function M.upload_zip_file_async(dw_config, cartridge_name, zip_file, callback)
   local upload_cmd = string.format(
-    "curl -s --max-time 30 -X PUT -H 'Content-Type: application/zip' -u %s:%s --data-binary @%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s_cartridge.zip",
+    "curl -s --max-time 20 -X PUT -H 'Content-Type: application/zip' -u %s:%s --data-binary @%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s_cartridge.zip",
     vim.fn.shellescape(dw_config.username), vim.fn.shellescape(dw_config.password),
     vim.fn.shellescape(zip_file), dw_config.hostname, dw_config["code-version"], cartridge_name)
   
@@ -268,10 +303,10 @@ function M.upload_zip_file_async(dw_config, cartridge_name, zip_file, callback)
   end
 end
 
--- NEW: Async server-side unzip
+-- Async server-side unzip
 function M.unzip_on_server_async(dw_config, cartridge_name, zip_file, callback)
   local unzip_cmd = string.format(
-    "curl -s --max-time 30 -X POST -H 'Content-Type: application/x-www-form-urlencoded' --data 'method=UNZIP' -u %s:%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s_cartridge.zip",
+    "curl -s --max-time 20 -X POST -H 'Content-Type: application/x-www-form-urlencoded' --data 'method=UNZIP' -u %s:%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s_cartridge.zip",
     vim.fn.shellescape(dw_config.username), vim.fn.shellescape(dw_config.password),
     dw_config.hostname, dw_config["code-version"], cartridge_name)
   
@@ -290,7 +325,7 @@ function M.unzip_on_server_async(dw_config, cartridge_name, zip_file, callback)
   end
 end
 
--- NEW: Async server cleanup
+-- Async server cleanup
 function M.cleanup_server_zip_async(dw_config, cartridge_name, zip_file, unzip_success, callback)
   local cleanup_cmd = string.format(
     "curl -s --max-time 10 -X DELETE -u %s:%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s_cartridge.zip",
@@ -318,15 +353,8 @@ function M.cleanup_server_zip_async(dw_config, cartridge_name, zip_file, unzip_s
   end
 end
 
--- LEGACY: Keep old sequential function for compatibility
-function M.upload_cartridges(dw_config, cartridge_names, opts, callback)
-  -- Redirect to new parallel implementation
-  M.upload_cartridges_parallel(dw_config, cartridge_names, opts, callback)
-end
-
-function M.upload_cartridge_zip(dw_config, cartridge_name, callback)
-  -- Redirect to new async implementation
-  M.upload_cartridge_async(dw_config, cartridge_name, callback)
-end
+-- Compatibility aliases
+M.upload_cartridges = M.upload_cartridges_parallel
+M.upload_cartridge_zip = M.upload_cartridge_async
 
 return M
