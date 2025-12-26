@@ -137,4 +137,69 @@ function M.get_cartridges()
   return cartridges
 end
 
+function M.check_sandbox_status(dw_config, callback)
+  if not dw_config then
+    callback(false, "No dw.json configuration found")
+    return
+  end
+  
+  -- Use a lightweight WebDAV request to check if sandbox is accessible
+  -- Try to access the root WebDAV directory with HEAD request (no data transfer)
+  local check_url = string.format("https://%s/on/demandware.servlet/webdav/Sites/", dw_config.hostname)
+  local check_cmd = string.format(
+    "curl -s -f --max-time 10 --head -u %s:%s %s",
+    vim.fn.shellescape(dw_config.username),
+    vim.fn.shellescape(dw_config.password),
+    vim.fn.shellescape(check_url)
+  )
+  
+  vim.fn.jobstart(check_cmd, {
+    on_exit = function(_, exit_code)
+      if exit_code == 0 then
+        callback(true, "Sandbox is online and accessible")
+      elseif exit_code == 7 then
+        callback(false, "Cannot connect to sandbox - check hostname and network connection")
+      elseif exit_code == 22 then
+        callback(false, "Authentication failed - check username and password in dw.json")
+      elseif exit_code == 28 then
+        callback(false, "Connection timeout - sandbox may be starting up or overloaded")
+      else
+        callback(false, string.format("Sandbox check failed (exit code %d) - sandbox may be offline", exit_code))
+      end
+    end,
+    on_stdout = function() end, -- Ignore output
+    on_stderr = function() end, -- Ignore errors (we handle via exit code)
+  })
+end
+
+function M.check_sandbox_status_sync(dw_config)
+  if not dw_config then
+    return false, "No dw.json configuration found"
+  end
+  
+  -- Synchronous version for immediate feedback
+  local check_url = string.format("https://%s/on/demandware.servlet/webdav/Sites/", dw_config.hostname)
+  local check_cmd = string.format(
+    "curl -s -f --max-time 10 --head -u %s:%s %s",
+    vim.fn.shellescape(dw_config.username),
+    vim.fn.shellescape(dw_config.password),
+    vim.fn.shellescape(check_url)
+  )
+  
+  local result = vim.fn.system(check_cmd)
+  local exit_code = vim.v.shell_error
+  
+  if exit_code == 0 then
+    return true, "Sandbox is online and accessible"
+  elseif exit_code == 7 then
+    return false, "Cannot connect to sandbox - check hostname and network connection"
+  elseif exit_code == 22 then
+    return false, "Authentication failed - check username and password in dw.json"
+  elseif exit_code == 28 then
+    return false, "Connection timeout - sandbox may be starting up or overloaded"
+  else
+    return false, string.format("Sandbox check failed (exit code %d) - sandbox may be offline", exit_code)
+  end
+end
+
 return M

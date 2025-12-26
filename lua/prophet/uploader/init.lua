@@ -96,26 +96,46 @@ function M.clean_upload(dw_config, opts)
     return
   end
   
-  vim.notify(string.format("Prophet: Starting clean upload of %d cartridge(s)...", #cartridges), vim.log.levels.INFO)
+  -- Check sandbox status before attempting upload
+  vim.notify("Prophet: Checking sandbox connectivity...", vim.log.levels.INFO)
+  local sandbox_ok, sandbox_msg = config_loader.check_sandbox_status_sync(dw_config)
+  
+  if not sandbox_ok then
+    vim.notify("Prophet: " .. sandbox_msg, vim.log.levels.ERROR)
+    return
+  end
+  
+  vim.notify(string.format("Prophet: Sandbox online. Starting clean upload of %d cartridge(s)...", #cartridges), vim.log.levels.INFO)
   
   local names = vim.tbl_map(function(c) return c.name end, cartridges)
   M.upload_cartridges(dw_config, names, opts)
 end
 
 function M.upload_single(dw_config, cartridge_name, opts)
+  -- Check sandbox status before single upload too
+  local sandbox_ok, sandbox_msg = config_loader.check_sandbox_status_sync(dw_config)
+  
+  if not sandbox_ok then
+    vim.notify("Prophet: " .. sandbox_msg, vim.log.levels.ERROR)
+    return
+  end
+  
   M.upload_cartridges(dw_config, { cartridge_name }, opts)
 end
 
 function M.upload_cartridges(dw_config, cartridge_names, opts, callback)
   local total = #cartridge_names
   local completed, failed = 0, 0
+  local early_abort = false
   
   local function upload_next(index)
-    if index > total then
-      local msg = failed == 0 
-        and string.format("Prophet: Successfully uploaded %d/%d cartridge(s)", completed, total)
-        or string.format("Prophet: Upload completed: %d succeeded, %d failed", completed, failed)
-      vim.notify(msg, failed == 0 and vim.log.levels.INFO or vim.log.levels.WARN)
+    if index > total or early_abort then
+      local msg = early_abort
+        and string.format("Prophet: Upload aborted after %d attempts due to sandbox connectivity issues", index - 1)
+        or (failed == 0 
+          and string.format("Prophet: Successfully uploaded %d/%d cartridge(s)", completed, total)
+          or string.format("Prophet: Upload completed: %d succeeded, %d failed", completed, failed))
+      vim.notify(msg, (failed == 0 and not early_abort) and vim.log.levels.INFO or vim.log.levels.WARN)
       if callback then callback() end
       return
     end
@@ -128,7 +148,20 @@ function M.upload_cartridges(dw_config, cartridge_names, opts, callback)
         completed = completed + 1
       else
         failed = failed + 1
-        vim.notify(string.format("Prophet: Failed to upload %s: %s", cartridge_name, err or "unknown"), vim.log.levels.ERROR)
+        local error_msg = err or "unknown"
+        
+        -- Check if this is a connectivity/authentication issue and abort early
+        if error_msg:find("connection") or error_msg:find("timeout") or 
+           error_msg:find("authentication") or error_msg:find("resolve host") or
+           error_msg:find("couldn't connect") or error_msg:find("network") then
+          vim.notify(string.format("Prophet: Connectivity issue detected: %s", error_msg), vim.log.levels.ERROR)
+          vim.notify("Prophet: Stopping upload to avoid repeated failures. Check sandbox status and try again.", vim.log.levels.WARN)
+          early_abort = true
+          upload_next(index + 1) -- Will trigger abort message
+          return
+        end
+        
+        vim.notify(string.format("Prophet: Failed to upload %s: %s", cartridge_name, error_msg), vim.log.levels.ERROR)
       end
       upload_next(index + 1)
     end)
@@ -163,14 +196,28 @@ function M.upload_cartridge_zip(dw_config, cartridge_name, callback)
       end
       
       local upload_cmd = string.format(
-        "curl -s -f -X PUT -u %s:%s --data-binary @%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s.zip",
+        "curl -s -f --max-time 30 -X PUT -u %s:%s --data-binary @%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s.zip",
         vim.fn.shellescape(dw_config.username), vim.fn.shellescape(dw_config.password),
         vim.fn.shellescape(zip_file), dw_config.hostname, dw_config["code-version"], cartridge_name)
       
       vim.fn.jobstart(upload_cmd, {
         on_exit = function(_, upload_exit_code)
           vim.fn.delete(zip_file)
-          callback(upload_exit_code == 0, upload_exit_code ~= 0 and "Upload failed" or nil)
+          
+          -- Provide specific error messages based on curl exit codes
+          if upload_exit_code == 0 then
+            callback(true, nil)
+          elseif upload_exit_code == 7 then
+            callback(false, "connection failed - cannot reach sandbox")
+          elseif upload_exit_code == 22 then
+            callback(false, "authentication failed - check credentials")
+          elseif upload_exit_code == 28 then
+            callback(false, "timeout - sandbox not responding")
+          elseif upload_exit_code == 6 then
+            callback(false, "couldn't resolve host - check hostname")
+          else
+            callback(false, string.format("upload failed (exit code %d)", upload_exit_code))
+          end
         end,
       })
     end,
