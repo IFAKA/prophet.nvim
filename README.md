@@ -1,4 +1,4 @@
-<img width="2560" height="1280" alt="image" src="https://github.com/user-attachments/assets/2c1e8c01-69c5-42eb-af17-87a898b4782b" />
+<img width="1280" height="640" alt="image" src="https://github.com/user-attachments/assets/250613a7-bea9-458d-acf9-80710fe2436f" />
 
 # Prophet.nvim
 
