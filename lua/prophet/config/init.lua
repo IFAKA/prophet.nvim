@@ -1,3 +1,4 @@
+-- Copy of the original file with the fixed functions
 local M = {}
 
 local function is_cartridge_project(project_file)
@@ -143,11 +144,13 @@ function M.check_sandbox_status(dw_config, callback)
     return
   end
   
-  -- Use a lightweight WebDAV request to check if sandbox is accessible
-  -- Try to access the root WebDAV directory with HEAD request (no data transfer)
-  local check_url = string.format("https://%s/on/demandware.servlet/webdav/Sites/", dw_config.hostname)
+  -- Use exact VSCode Prophet PROPFIND approach for connectivity check
+  local code_version = dw_config["code-version"] or "version1"
+  local check_url = string.format("https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/", 
+    dw_config.hostname, code_version)
+  
   local check_cmd = string.format(
-    "curl -s -f --max-time 10 --head -u %s:%s %s",
+    "curl -s --max-time 10 -X PROPFIND -H 'Depth: 1' -u %s:%s %s",
     vim.fn.shellescape(dw_config.username),
     vim.fn.shellescape(dw_config.password),
     vim.fn.shellescape(check_url)
@@ -163,6 +166,8 @@ function M.check_sandbox_status(dw_config, callback)
         callback(false, "Authentication failed - check username and password in dw.json")
       elseif exit_code == 28 then
         callback(false, "Connection timeout - sandbox may be starting up or overloaded")
+      elseif exit_code == 56 then
+        callback(false, "Network receive error - check credentials and WebDAV permissions")
       else
         callback(false, string.format("Sandbox check failed (exit code %d) - sandbox may be offline", exit_code))
       end
@@ -177,10 +182,13 @@ function M.check_sandbox_status_sync(dw_config)
     return false, "No dw.json configuration found"
   end
   
-  -- Synchronous version for immediate feedback
-  local check_url = string.format("https://%s/on/demandware.servlet/webdav/Sites/", dw_config.hostname)
+  -- Use exact VSCode Prophet PROPFIND approach for connectivity check
+  local code_version = dw_config["code-version"] or "version1"
+  local check_url = string.format("https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/", 
+    dw_config.hostname, code_version)
+  
   local check_cmd = string.format(
-    "curl -s -f --max-time 10 --head -u %s:%s %s",
+    "curl -s --max-time 10 -X PROPFIND -H 'Depth: 1' -u %s:%s %s",
     vim.fn.shellescape(dw_config.username),
     vim.fn.shellescape(dw_config.password),
     vim.fn.shellescape(check_url)
@@ -197,6 +205,8 @@ function M.check_sandbox_status_sync(dw_config)
     return false, "Authentication failed - check username and password in dw.json"
   elseif exit_code == 28 then
     return false, "Connection timeout - sandbox may be starting up or overloaded"
+  elseif exit_code == 56 then
+    return false, "Network receive error - check credentials and WebDAV permissions"
   else
     return false, string.format("Sandbox check failed (exit code %d) - sandbox may be offline", exit_code)
   end

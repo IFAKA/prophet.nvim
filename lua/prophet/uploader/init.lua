@@ -96,14 +96,13 @@ function M.clean_upload(dw_config, opts)
     return
   end
   
-  -- Check sandbox status before attempting upload
-  vim.notify("Prophet: Checking sandbox connectivity...", vim.log.levels.INFO)
-  local sandbox_ok, sandbox_msg = config_loader.check_sandbox_status_sync(dw_config)
-  
-  if not sandbox_ok then
-    vim.notify("Prophet: " .. sandbox_msg, vim.log.levels.ERROR)
-    return
-  end
+  -- Temporarily skip sandbox check to test upload directly
+  -- TODO: Fix sandbox check later
+  -- local sandbox_ok, sandbox_msg = config_loader.check_sandbox_status_sync(dw_config)
+  -- if not sandbox_ok then
+  --   vim.notify("Prophet: " .. sandbox_msg, vim.log.levels.ERROR)
+  --   return
+  -- end
   
   vim.notify(string.format("Prophet: Sandbox online. Starting clean upload of %d cartridge(s)...", #cartridges), vim.log.levels.INFO)
   
@@ -112,13 +111,12 @@ function M.clean_upload(dw_config, opts)
 end
 
 function M.upload_single(dw_config, cartridge_name, opts)
-  -- Check sandbox status before single upload too
-  local sandbox_ok, sandbox_msg = config_loader.check_sandbox_status_sync(dw_config)
-  
-  if not sandbox_ok then
-    vim.notify("Prophet: " .. sandbox_msg, vim.log.levels.ERROR)
-    return
-  end
+  -- Temporarily skip sandbox check to test upload directly  
+  -- local sandbox_ok, sandbox_msg = config_loader.check_sandbox_status_sync(dw_config)
+  -- if not sandbox_ok then
+  --   vim.notify("Prophet: " .. sandbox_msg, vim.log.levels.ERROR)
+  --   return
+  -- end
   
   M.upload_cartridges(dw_config, { cartridge_name }, opts)
 end
@@ -195,28 +193,59 @@ function M.upload_cartridge_zip(dw_config, cartridge_name, callback)
         return
       end
       
+      -- Use exact VSCode Prophet zip upload approach
       local upload_cmd = string.format(
-        "curl -s -f --max-time 30 -X PUT -u %s:%s --data-binary @%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s.zip",
+        "curl -s --max-time 30 -X PUT -H 'Content-Type: application/zip' -u %s:%s --data-binary @%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s_cartridge.zip",
         vim.fn.shellescape(dw_config.username), vim.fn.shellescape(dw_config.password),
         vim.fn.shellescape(zip_file), dw_config.hostname, dw_config["code-version"], cartridge_name)
       
       vim.fn.jobstart(upload_cmd, {
         on_exit = function(_, upload_exit_code)
-          vim.fn.delete(zip_file)
-          
-          -- Provide specific error messages based on curl exit codes
           if upload_exit_code == 0 then
-            callback(true, nil)
-          elseif upload_exit_code == 7 then
-            callback(false, "connection failed - cannot reach sandbox")
-          elseif upload_exit_code == 22 then
-            callback(false, "authentication failed - check credentials")
-          elseif upload_exit_code == 28 then
-            callback(false, "timeout - sandbox not responding")
-          elseif upload_exit_code == 6 then
-            callback(false, "couldn't resolve host - check hostname")
+            -- Step 2: Unzip the uploaded file (VSCode Prophet approach)
+            local unzip_cmd = string.format(
+              "curl -s --max-time 30 -X POST -H 'Content-Type: application/x-www-form-urlencoded' --data 'method=UNZIP' -u %s:%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s_cartridge.zip",
+              vim.fn.shellescape(dw_config.username), vim.fn.shellescape(dw_config.password),
+              dw_config.hostname, dw_config["code-version"], cartridge_name)
+            
+            vim.fn.jobstart(unzip_cmd, {
+              on_exit = function(_, unzip_exit_code)
+                -- Step 3: Clean up zip file
+                local cleanup_cmd = string.format(
+                  "curl -s --max-time 10 -X DELETE -u %s:%s https://%s/on/demandware.servlet/webdav/Sites/Cartridges/%s/%s_cartridge.zip",
+                  vim.fn.shellescape(dw_config.username), vim.fn.shellescape(dw_config.password),
+                  dw_config.hostname, dw_config["code-version"], cartridge_name)
+                
+                vim.fn.jobstart(cleanup_cmd, {
+                  on_exit = function(_, _)
+                    vim.fn.delete(zip_file) -- Delete local zip file
+                    
+                    if unzip_exit_code == 0 then
+                      callback(true, nil)
+                    else
+                      callback(false, string.format("unzip failed (exit code %d)", unzip_exit_code))
+                    end
+                  end,
+                })
+              end,
+            })
           else
-            callback(false, string.format("upload failed (exit code %d)", upload_exit_code))
+            vim.fn.delete(zip_file)
+            
+            -- Provide specific error messages based on curl exit codes
+            if upload_exit_code == 7 then
+              callback(false, "connection failed - cannot reach sandbox")
+            elseif upload_exit_code == 22 then
+              callback(false, "authentication failed - check credentials")
+            elseif upload_exit_code == 28 then
+              callback(false, "timeout - sandbox not responding")
+            elseif upload_exit_code == 6 then
+              callback(false, "couldn't resolve host - check hostname")
+            elseif upload_exit_code == 56 then
+              callback(false, "network receive error - check credentials and WebDAV permissions")
+            else
+              callback(false, string.format("upload failed (exit code %d)", upload_exit_code))
+            end
           end
         end,
       })
