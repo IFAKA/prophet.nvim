@@ -23,42 +23,59 @@ Zero configuration. Reads from your existing `dw.json`. Shows upload progress li
 
 ## Installation
 
-### Lazy.nvim
+### VimZap (Pre-installed!)
+
+Prophet.nvim comes **pre-installed** with [VimZap](https://github.com/IFAKA/vimzap):
+
+```bash
+curl -fsSL ifaka.github.io/vimzap/i | bash
+```
+
+Keymaps and configuration are already set up - just use it!
+
+### Other Distributions
+
+See [INSTALLATION.md](INSTALLATION.md) for:
+- LazyVim
+- NvChad
+- AstroNvim
+- Vanilla Neovim (lazy.nvim, packer, vim-plug)
+- Manual installation
+
+**Quick setup (lazy.nvim):**
 
 ```lua
 {
   "IFAKA/prophet.nvim",
+  lazy = false,
   config = function()
     require("prophet").setup({
-      auto_upload = false,       -- Enable/disable auto-upload on save
-      clean_on_start = true,     -- Clean upload all on startup (default: true)
-      notify = true,             -- Show progress notifications
-      progress_style = "float",  -- "float" or "statusline"
-      keymaps = true,            -- Enable default keymaps (<leader>p prefix)
-      ignore_patterns = {        -- Files/folders to ignore
-        "node_modules",
-        "%.git",
-        "%.zip$",
-      },
+      keymaps = true,  -- Enable default keymaps
     })
   end,
 }
 ```
 
-### Packer
-
-```lua
-use {
-  "IFAKA/prophet.nvim",
-  config = function()
-    require("prophet").setup()
-  end
-}
-```
-
 ## Configuration
 
-Prophet.nvim reads your existing `dw.json` file. No additional configuration needed!
+Prophet.nvim reads your existing `dw.json` file. Minimal configuration needed!
+
+### Default Settings
+
+```lua
+require("prophet").setup({
+  auto_upload = false,       -- Don't watch files by default
+  clean_on_start = true,     -- Upload all cartridges on startup  
+  notify = true,             -- Show progress notifications
+  progress_style = "float",  -- Floating window style
+  keymaps = false,           -- Keymaps are opt-in (see below)
+  ignore_patterns = {
+    "node_modules",
+    "%.git",
+    "%.zip$",
+  },
+})
+```
 
 ### Example `dw.json`
 
