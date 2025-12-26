@@ -190,18 +190,20 @@ vim.api.nvim_create_autocmd({"BufRead", "BufNewFile"}, {
 
 -- Set filetype for ISML files
 vim.api.nvim_create_autocmd({"BufRead", "BufNewFile"}, {
-  group = "ProphetAutoCommands", 
+  group = "ProphetAutoCommands",
   pattern = "*.isml",
   callback = function()
-    vim.bo.filetype = "html"  -- Use HTML syntax highlighting for now
+    vim.bo.filetype = "isml"
+    vim.bo.syntax = "isml"  -- Use custom ISML syntax if available
   end,
 })
 
 -- Set filetype for DWScript files
 vim.api.nvim_create_autocmd({"BufRead", "BufNewFile"}, {
   group = "ProphetAutoCommands",
-  pattern = "*.ds", 
+  pattern = "*.ds",
   callback = function()
-    vim.bo.filetype = "javascript"  -- Use JavaScript syntax highlighting for now
+    vim.bo.filetype = "ds"
+    vim.bo.syntax = "ds"  -- Use custom DWScript syntax if available
   end,
 })
