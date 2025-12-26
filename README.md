@@ -88,6 +88,7 @@ require("prophet").setup({
 - `:ProphetClean` - Clean upload all cartridges (force upload)
 - `:ProphetUpload [name]` - Upload specific cartridge (shows picker if no name)
 - `:ProphetStatus` - Show comprehensive plugin status and configuration
+- `:ProphetCheckSandbox` - Test sandbox connectivity and authentication
 
 ### **Debug Commands (Foundation)**
 - `:ProphetDebugConnect` - Connect to SFCC debugger (placeholder)
@@ -230,8 +231,15 @@ This plugin is designed to match the functionality of the original SqrTT/prophet
 - Ensure Neovim 0.9+ is installed
 - Check for conflicts with other plugins
 
+### **Sandbox offline/authentication issues:**
+- Run `:ProphetCheckSandbox` to test connectivity
+- Check if your sandbox is started and accessible via browser
+- Verify credentials in `dw.json` are correct
+- Plugin will now check connectivity before uploads to avoid repeated failures
+
 ### **Getting Help:**
-- Run `:ProphetStatus` for comprehensive diagnostic information
+- Run `:ProphetStatus` for comprehensive diagnostic information including sandbox status
+- Use `:ProphetCheckSandbox` for immediate connectivity testing
 - Check GitHub issues for known problems
 - Compare behavior with SqrTT/prophet if available
 
