@@ -13,23 +13,58 @@ function M.init(dw_config, opts)
 end
 
 function M.enable_watch()
-  if #watchers > 0 then return end
+  if #watchers > 0 then 
+    vim.notify("Prophet: Upload watching already enabled", vim.log.levels.INFO)
+    return 
+  end
   
   local cartridges = config_loader.get_cartridges()
+  if #cartridges == 0 then
+    vim.notify("Prophet: No cartridges found to watch", vim.log.levels.WARN)
+    return
+  end
+  
+  local watched_count = 0
   for _, cartridge in ipairs(cartridges) do
     local watcher = vim.loop.new_fs_event()
     if watcher then
-      watcher:start(cartridge.path, { recursive = true }, vim.schedule_wrap(function(err, filename)
-        if err or utils.should_ignore(filename, M.opts.ignore_patterns) then return end
-        if not vim.tbl_contains(upload_queue, cartridge.name) then
-          table.insert(upload_queue, cartridge.name)
+      local success = watcher:start(cartridge.path, { recursive = true }, vim.schedule_wrap(function(err, filename)
+        if err then 
+          vim.notify("Prophet: File watch error: " .. err, vim.log.levels.ERROR)
+          return 
         end
-        vim.defer_fn(M.process_queue, 1000)
+        
+        if utils.should_ignore(filename, M.opts.ignore_patterns) then 
+          return 
+        end
+        
+        -- Only queue if file is in cartridge/subfolder
+        local full_path = cartridge.path .. "/" .. filename
+        if utils.is_sfcc_file(full_path) then
+          if not vim.tbl_contains(upload_queue, cartridge.name) then
+            table.insert(upload_queue, cartridge.name)
+            if M.opts.notify then
+              vim.notify(string.format("Prophet: Queued %s for upload", cartridge.name), vim.log.levels.INFO)
+            end
+          end
+          vim.defer_fn(M.process_queue, 1000)
+        end
       end))
-      table.insert(watchers, watcher)
+      
+      if success then
+        table.insert(watchers, watcher)
+        watched_count = watched_count + 1
+      else
+        vim.notify("Prophet: Failed to watch " .. cartridge.name, vim.log.levels.WARN)
+      end
     end
   end
-  vim.notify("Prophet: Watching " .. #cartridges .. " cartridge(s)", vim.log.levels.INFO)
+  
+  if watched_count > 0 then
+    vim.notify(string.format("Prophet: Watching %d cartridge(s) for changes", watched_count), vim.log.levels.INFO)
+  else
+    vim.notify("Prophet: Failed to enable file watching", vim.log.levels.ERROR)
+  end
 end
 
 function M.disable_watch()

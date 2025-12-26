@@ -1,0 +1,108 @@
+{
+  "isinclude": {
+    "prefix": "isinclude",
+    "body": [
+      "<isinclude template=\"$1\" />"
+    ],
+    "description": "Include a template"
+  },
+  "ismodule": {
+    "prefix": "ismodule",
+    "body": [
+      "<ismodule template=\"$1\" name=\"$2\" attribute=\"$3\" />"
+    ],
+    "description": "Include a module"
+  },
+  "isdecorate": {
+    "prefix": "isdecorate",
+    "body": [
+      "<isdecorate template=\"$1\">",
+      "\t$0",
+      "</isdecorate>"
+    ],
+    "description": "Decorate with template"
+  },
+  "isif": {
+    "prefix": "isif",
+    "body": [
+      "<isif condition=\"${$1}\">",
+      "\t$0",
+      "</isif>"
+    ],
+    "description": "Conditional block"
+  },
+  "iselseif": {
+    "prefix": "iselseif",
+    "body": [
+      "<iselseif condition=\"${$1}\">",
+      "\t$0"
+    ],
+    "description": "Else if condition"
+  },
+  "iselse": {
+    "prefix": "iselse",
+    "body": [
+      "<iselse>",
+      "\t$0"
+    ],
+    "description": "Else block"
+  },
+  "isloop": {
+    "prefix": "isloop",
+    "body": [
+      "<isloop items=\"${$1}\" var=\"$2\">",
+      "\t$0",
+      "</isloop>"
+    ],
+    "description": "Loop over collection"
+  },
+  "isset": {
+    "prefix": "isset",
+    "body": [
+      "<isset name=\"$1\" value=\"$2\" scope=\"$3\" />"
+    ],
+    "description": "Set variable"
+  },
+  "isscript": {
+    "prefix": "isscript",
+    "body": [
+      "<isscript>",
+      "\t$0",
+      "</isscript>"
+    ],
+    "description": "Script block"
+  },
+  "iscomment": {
+    "prefix": "iscomment",
+    "body": [
+      "<iscomment>",
+      "\t$0",
+      "</iscomment>"
+    ],
+    "description": "Comment block"
+  },
+  "form": {
+    "prefix": "form",
+    "body": [
+      "<form action=\"${URLUtils.url('$1')}\" method=\"$2\" name=\"$3\">",
+      "\t<input type=\"hidden\" name=\"${pdict.csrf.tokenName}\" value=\"${pdict.csrf.token}\"/>",
+      "\t$0",
+      "</form>"
+    ],
+    "description": "Form with CSRF protection"
+  },
+  "resource": {
+    "prefix": "resource",
+    "body": [
+      "${Resource.msg('$1','$2',null)}"
+    ],
+    "description": "Resource message"
+  },
+  "url": {
+    "prefix": "url",
+    "body": [
+      "${URLUtils.url('$1')}"
+    ],
+    "description": "URL generation"
+  }
+}
