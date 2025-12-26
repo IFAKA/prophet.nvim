@@ -96,16 +96,45 @@ vim.api.nvim_create_user_command("ProphetStatus", function()
   table.insert(lines, string.format("Debug Support: %s", debug_status.supported and "✓ Available" or "✗ Not Available"))
   table.insert(lines, string.format("Debug State: %s", debug_status.state))
   
-  -- Create a scratch buffer to display status
-  local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
-  vim.api.nvim_buf_set_option(buf, "filetype", "prophet")
-  
-  -- Open in a split
-  vim.cmd("split")
-  vim.api.nvim_win_set_buf(0, buf)
-  vim.api.nvim_buf_set_name(buf, "Prophet Status")
+  if dw_config then
+    table.insert(lines, "")
+    table.insert(lines, "Sandbox Status: Checking...")
+    
+    -- Create buffer first
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+    vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
+    vim.api.nvim_buf_set_option(buf, "filetype", "prophet")
+    
+    -- Open in a split
+    vim.cmd("split")
+    vim.api.nvim_win_set_buf(0, buf)
+    vim.api.nvim_buf_set_name(buf, "Prophet Status")
+    
+    -- Check sandbox status asynchronously and update buffer
+    config_loader.check_sandbox_status(dw_config, function(success, message)
+      local status_line = string.format("Sandbox Status: %s %s", 
+        success and "✓" or "✗", message)
+      
+      -- Update the last line with sandbox status
+      if vim.api.nvim_buf_is_valid(buf) then
+        local current_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+        current_lines[#current_lines] = status_line
+        vim.api.nvim_buf_set_lines(buf, 0, -1, false, current_lines)
+      end
+    end)
+  else
+    -- Create a scratch buffer to display status
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+    vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
+    vim.api.nvim_buf_set_option(buf, "filetype", "prophet")
+    
+    -- Open in a split
+    vim.cmd("split")
+    vim.api.nvim_win_set_buf(0, buf)
+    vim.api.nvim_buf_set_name(buf, "Prophet Status")
+  end
 end, { desc = "Prophet: Show Status" })
 
 -- Debug commands (placeholder for future SDAPI 2.0 implementation)
@@ -125,6 +154,24 @@ vim.api.nvim_create_user_command("ProphetDebugBreakpoint", function()
   local line = vim.fn.line(".")
   debugger.set_breakpoint(file, line)
 end, { desc = "Prophet: Toggle Breakpoint" })
+
+vim.api.nvim_create_user_command("ProphetCheckSandbox", function()
+  local config_loader = require("prophet.config")
+  local dw_config = config_loader.load()
+  
+  if not dw_config then
+    vim.notify("Prophet: No dw.json found", vim.log.levels.ERROR)
+    return
+  end
+  
+  vim.notify("Prophet: Checking sandbox connectivity...", vim.log.levels.INFO)
+  
+  config_loader.check_sandbox_status(dw_config, function(success, message)
+    local level = success and vim.log.levels.INFO or vim.log.levels.ERROR
+    local status = success and "✓" or "✗"
+    vim.notify(string.format("Prophet: %s %s", status, message), level)
+  end)
+end, { desc = "Prophet: Check Sandbox Status" })
 
 -- Auto-commands for file watching and SFCC file detection
 vim.api.nvim_create_augroup("ProphetAutoCommands", { clear = true })
