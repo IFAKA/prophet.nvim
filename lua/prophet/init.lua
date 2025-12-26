@@ -1,7 +1,7 @@
 local M = {}
 
 local uploader = require("prophet.uploader")
-local config_loader = require("prophet.config")
+local config = require("prophet.config")
 
 M.config = {
   auto_upload = false,
@@ -12,28 +12,19 @@ M.config = {
 
 function M.setup(opts)
   M.config = vim.tbl_deep_extend("force", M.config, opts or {})
-  
-  local dw_config = config_loader.load()
-  if not dw_config then
-    vim.notify("Prophet: No dw.json found in project root", vim.log.levels.WARN)
+  local dw = config.load()
+  if not dw then
+    vim.notify("Prophet: No dw.json found", vim.log.levels.WARN)
     return
   end
-  
-  uploader.init(dw_config, M.config)
-  
-  if M.config.clean_on_start then
-    vim.defer_fn(M.clean_upload, 1000)
-  end
-  
-  if M.config.auto_upload then
-    M.enable_upload()
-  end
+  uploader.init(dw, M.config)
+  if M.config.clean_on_start then vim.defer_fn(M.clean_upload, 1000) end
+  if M.config.auto_upload then uploader.enable_watch() end
 end
 
 function M.enable_upload()
   M.config.auto_upload = true
   uploader.enable_watch()
-  vim.notify("Prophet: Upload enabled", vim.log.levels.INFO)
 end
 
 function M.disable_upload()
@@ -47,21 +38,21 @@ function M.toggle_upload()
 end
 
 function M.clean_upload()
-  local dw_config = config_loader.load()
-  if not dw_config then
+  local dw = config.load()
+  if not dw then
     vim.notify("Prophet: No dw.json found", vim.log.levels.ERROR)
     return
   end
-  uploader.clean_upload(dw_config, M.config)
+  uploader.clean_upload(dw, M.config)
 end
 
-function M.upload_cartridge(cartridge_name)
-  local dw_config = config_loader.load()
-  if not dw_config then
+function M.upload_cartridge(name)
+  local dw = config.load()
+  if not dw then
     vim.notify("Prophet: No dw.json found", vim.log.levels.ERROR)
     return
   end
-  uploader.upload_single(dw_config, cartridge_name, M.config)
+  uploader.upload_single(dw, name, M.config)
 end
 
 return M
