@@ -1,0 +1,10 @@
+name: test
+on: [push, pull_request]
+jobs:
+  headless:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rhysd/action-setup-vim@v1
+        with: { version: nightly, neovim: true }
+      - run: bash tests/run.sh

@@ -33,7 +33,7 @@ A comprehensive Neovim plugin for Salesforce Commerce Cloud (SFCC) development, 
 
 ## Requirements
 
-- Neovim 0.9+
+- Neovim 0.12+
 - `curl` and `zip` commands
 - `dw.json` in project root
 
@@ -90,12 +90,11 @@ require("prophet").setup({
 - `:ProphetStatus` - Show comprehensive plugin status and configuration
 - `:ProphetCheckSandbox` - Test sandbox connectivity and authentication
 
-### **Debug Commands (Foundation)**
-- `:ProphetDebugConnect` - Connect to SFCC debugger (placeholder)
-- `:ProphetDebugDisconnect` - Disconnect from debugger (placeholder) 
-- `:ProphetDebugBreakpoint` - Toggle breakpoint (placeholder)
-
-*Note: Full debugging requires SDAPI 2.0 implementation - currently shows placeholders*
+### **Project Commands**
+- `:ProphetControllers` - Find controller endpoints
+- `:ProphetTemplates` - Find ISML templates
+- `:ProphetLogs` - Open sandbox logs
+- `:ProphetRefresh` - Refresh project caches
 
 ## Keymaps
 
@@ -161,8 +160,8 @@ The plugin now uses the same logic as SqrTT/prophet:
 
 ## Snippets & File Support
 
-### **ISML Snippets**
-Available in `.isml` files:
+### **ISML Templates**
+Prophet provides filetype detection, indentation, syntax highlighting, HTML Tree-sitter parsing, and native SFCC completion. Snippet expansion is intentionally left to dedicated snippet plugins.
 - `isinclude` - Include templates
 - `ismodule` - Module inclusion  
 - `isdecorate` - Template decoration
